@@ -55,3 +55,71 @@ def get_files_info(working_directory, directory=None):
 
 	except Exception as e:
 		return f'Error: {e}'
+	
+# Create function to get file content
+def get_file_content(working_directory, file_path):
+
+	abs_path = os.path.join(working_directory, file_path)
+
+	# Ensure the working directory and directory are absolute paths
+	working_dir = os.path.abspath(working_directory)
+	file_path_dir = os.path.abspath(abs_path)
+
+	# Check if file_path is within working_directory using os.path.commonpath
+	try:
+		common = os.path.commonpath([working_dir, file_path_dir])
+		if common != working_dir:
+			return f'Error: Cannot read "{file_path}" as it is outside the permitted working directory'
+	except ValueError:
+		return f'Error: Cannot read "{file_path}" as it is outside the permitted working directory'
+	
+	
+	
+	# if file_path is not a file, return an error message
+	if not os.path.isfile(abs_path):
+		return f'Error: File not found or is not a regular file: "{file_path}"'
+	
+	# read the file and return its content as string. Always return. if file is longer than 1000 characters, truncate it to 1000 characters and append message
+	try:
+		with open(abs_path, 'r') as file:
+			content = file.read()
+			if len(content) > 10000:
+				return f"{content[:10000]}[...File \"{file_path}\" truncated at 10000 characters]"
+			return content
+	except Exception as e:
+		return f'Error: {e}'
+
+# Write and overwrite files
+def write_file(working_directory, file_path, content):
+	abs_path = os.path.join(working_directory, file_path)
+
+	# Ensure the working directory and directory are absolute paths
+	working_dir = os.path.abspath(working_directory)
+	file_path_dir = os.path.abspath(abs_path)
+
+	# Check if file_path is within working_directory using os.path.commonpath
+	try:
+		common = os.path.commonpath([working_dir, file_path_dir])
+		if common != working_dir:
+			return f'Error: Cannot write to "{file_path}" as it is outside the permitted working directory'
+	except ValueError:
+		return f'Error: Cannot write to "{file_path}" as it is outside the permitted working directory'
+	
+	# if file_path doesn't exist, create it. If there is an error, return an error message
+	if not os.path.exists(os.path.dirname(abs_path)):
+		try:
+			os.makedirs(os.path.dirname(abs_path))
+		except Exception as e:
+			return f'Error: Could not create directory for "{file_path}": {e}'
+
+	# write the content to the file, overwriting it if it exists
+	try:
+		with open(abs_path, 'w') as file:
+			file.write(content)
+		return f'Successfully wrote to "{file_path}" ({len(content)} characters written)'
+	except Exception as e:
+		return f'Error: Could not write to file "{file_path}": {e}'
+	
+	
+
+
