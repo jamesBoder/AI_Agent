@@ -1,4 +1,10 @@
 import os
+import json
+import google
+from google.generativeai import types
+from config import system_prompt
+
+
 
 def get_files_info(working_directory, directory=None):
 	# if directory is None, default to listing the working directory itself
@@ -120,6 +126,40 @@ def write_file(working_directory, file_path, content):
 	except Exception as e:
 		return f'Error: Could not write to file "{file_path}": {e}'
 	
+
+# Use types.FunctionDeclaration to build teh "declaration" or "schema" of the function
+schema_get_files_info = types.protos.FunctionDeclaration(
+    name="get_files_info",
+    description="Lists files in the specified directory along with their sizes, constrained to the working directory.",
+    parameters=types.protos.Schema(
+        type=types.protos.Type.OBJECT,
+        properties={
+            "directory": types.protos.Schema(
+                type=types.protos.Type.STRING,
+                description="The directory to list files from, relative to the working directory. If not provided, lists files in the working directory itself.",
+            ),
+        },
+    ),
+)
+
+available_functions = types.protos.Tool(
+    function_declarations=[
+        schema_get_files_info,
+    ]
+)
+
+
+# If/else to check response.candidates and handle function calls
+def handle_function_calls(response):
+	for candidate in response.candidates:
+		for part in candidate.content.parts:
+			if hasattr(part, "function_call") and part.function_call:
+				args = dict(part.function_call.args)  # convert to regular dict
+				print(f"Calling function: {part.function_call.name}({args})")
+			elif hasattr(part, "text") and part.text:
+				print(part.text)
+		
+		
 	
 
 
