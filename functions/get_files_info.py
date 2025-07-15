@@ -1,8 +1,11 @@
 import os
-import json
-import google
+from google import generativeai as genai
 from google.generativeai import types
-from config import system_prompt
+
+from functions.run_python import run_python_file
+
+# define working_directory as the current working directory
+working_directory = os.getcwd()
 
 
 
@@ -18,18 +21,6 @@ def get_files_info(working_directory, directory=None):
 	parent_dir = os.path.abspath(working_directory)
 	child_dir = os.path.abspath(directory)
 
-		# Add these debug lines temporarily:
-	#print(f"Debug: parent_dir = {parent_dir}")
-	#print(f"Debug: child_dir = {child_dir}")
-	#print(f"Debug: working_directory = {working_directory}")
-	#print(f"Debug: directory = {directory}")
-
-
-	# Make sure both paths end with a path separator
-	#parent_dir = os.path.join(parent_dir, '')
-	#child_dir = os.path.join(child_dir, '')
-	
-		# Check if child_dir is within parent_dir using os.path.commonpath
 	try:
 		common = os.path.commonpath([parent_dir, child_dir])
 		if common != parent_dir:
@@ -142,24 +133,142 @@ schema_get_files_info = types.protos.FunctionDeclaration(
     ),
 )
 
+# build schema_get_file_content function
+schema_get_file_content = types.protos.FunctionDeclaration(
+	name="get_file_content",
+	description="Retrieves the content of a specified file, constrained to the working directory.",
+	parameters=types.protos.Schema(
+		type=types.protos.Type.OBJECT,
+		properties={
+			"file_path": types.protos.Schema(
+				type=types.protos.Type.STRING,
+				description="The path to the file to retrieve content from, relative to the working directory.",
+			),
+		},
+	),
+)
+
+# build schema_run_python_file function
+schema_run_python_file = types.protos.FunctionDeclaration(
+	name="run_python_file",
+	description="runs a Python file and returns its output, constrained to the working directory.",
+	parameters=types.protos.Schema(
+		type=types.protos.Type.OBJECT,
+		properties={
+			"file_path": types.protos.Schema(
+				type=types.protos.Type.STRING,
+				description="The path to the Python file to run, relative to the working directory.",
+			),
+			"content": types.protos.Schema(
+				type=types.protos.Type.STRING,
+				description="Executable Python code to run. If provided, this will override the file_path parameter.",
+			),
+		},
+	),
+)
+
+# build schema_write_file function
+schema_write_file = types.protos.FunctionDeclaration(
+	name="write_file",
+	description="Writes content to a specified file, creating the file if it does not exist, constrained to the working directory.",
+	parameters=types.protos.Schema(
+		type=types.protos.Type.OBJECT,
+		properties={
+			"file_path": types.protos.Schema(
+				type=types.protos.Type.STRING,
+				description="The path to the file to write to, relative to the working directory.",
+			),
+			"content": types.protos.Schema(
+				type=types.protos.Type.STRING,
+				description="The content to write to the file.",
+			),
+		},
+	),
+)
+
 available_functions = types.protos.Tool(
     function_declarations=[
         schema_get_files_info,
+		schema_get_file_content,
+		schema_run_python_file,
+		schema_write_file
     ]
 )
 
 
-# If/else to check response.candidates and handle function calls
-def handle_function_calls(response):
+# write a function to handle function calls
+def call_function(function_call_part, verbose=False):
+	# if verbose, print function_call_part and args
+	if verbose:
+		print(f"Calling function: {function_call_part.name}({function_call_part.args})")
+	else:
+		# just print the name
+		print(f" - Calling function: {function_call_part.name}")
+
+	# Add working_directory to args
+	args_with_working_dir = dict(function_call_part.args)  # Convert to regular dict
+	args_with_working_dir["working_directory"] = "./calculator"
+
+	# Call the function based on the function_call_part.name
+	if function_call_part.name == "get_files_info":
+		result = get_files_info(**args_with_working_dir)
+	elif function_call_part.name == "get_file_content":
+		result = get_file_content(**args_with_working_dir)
+	elif function_call_part.name == "run_python_file":
+		result = run_python_file(**args_with_working_dir)
+	elif function_call_part.name == "write_file":
+		result = write_file(**args_with_working_dir)
+	else:
+		# return types.Content 
+		return types.ContentDict(
+			role="tool",
+			parts=[
+				types.PartDict.from_function_response(
+					name=function_call_part.name,
+					response={"error": f"Unknown function: {function_call_part.name}"},
+				)
+			],
+		)
+
+	# Return the result as types.Content
+	return types.ContentDict(
+		role="tool",
+		parts=[
+			types.PartDict.from_function_response(
+				name=function_call_part.name,
+				response={"result": result}
+			)
+		],
+
+	)
+
+# Handle function calls and return the result
+
+def handle_function_calls(response, verbose):
 	for candidate in response.candidates:
 		for part in candidate.content.parts:
 			if hasattr(part, "function_call") and part.function_call:
-				args = dict(part.function_call.args)  # convert to regular dict
-				print(f"Calling function: {part.function_call.name}({args})")
-			elif hasattr(part, "text") and part.text:
-				print(part.text)
-		
-		
-	
+				result = call_function(part.function_call, verbose)
 
+				# Check if result has the expected structure
+				# Handle both object and dictionary formats
+				if result:
+					if hasattr(result, 'parts'):
+						# Object format
+						if result.parts and result.parts[0].function_response:
+							if verbose:
+								#print(f"-> {result.parts[0].function_response.response}")
+								pass
+					elif isinstance(result, dict) and 'parts' in result:
+						# Dictionary format
+						if result['parts'] and 'function_response' in result['parts'][0]:
+							#if verbose:
+								#print(f"-> {result['parts'][0]['function_response']['response']}")
+							pass
+					else:
+						raise Exception("Function call failed to return proper response")
+					return result
+				else:
+					raise Exception("Function call failed to return proper response")
+	return None  # If no function calls were made, return None
 

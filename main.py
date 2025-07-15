@@ -2,12 +2,15 @@ import os
 from dotenv import load_dotenv
 # from google import genai
 import google.generativeai as genai
-from google.generativeai import types # Keep this for GenerateContentConfig
+from google.generativeai import types 
 import sys
-from functions.get_files_info import schema_get_files_info, handle_function_calls, available_functions
+from functions.get_files_info import schema_get_files_info, handle_function_calls, available_functions, call_function
 from config import system_prompt
 
 # print(sys.argv)
+
+# define working_directory as the current working directory
+working_directory = os.getcwd()
 
 
 
@@ -20,61 +23,85 @@ if not api_key:
 # Import genai library to create a new instance of the Gemini API client
 genai.configure(api_key=api_key)
 
-# Define the model you want to use
-model_name = "gemini-1.5-flash" # A common and capable model
+
+
+if __name__ == "__main__":
+
+    # init is_verbose boolean variable
+    is_verbose = "--verbose" in sys.argv
+        # Your prompt-argument checks and agent logic go here
+
+
+        # if len(sys.argv) == 1: skip the prompt argument check and run the script and return
+    if len(sys.argv) == 1:
+        print("No prompt provided. Running default agent behavior.")
+        sys.exit(0)
+
+    elif len(sys.argv) != 1:
+        # Extract the user prompt from command line arguments, excluding any flags (arguments starting with '--')
+        prompt_args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+        user_prompt = " ".join(prompt_args)
+        # if user_prompt is only flag arguments, print error message and exit program with exit code 1
+        if not user_prompt.strip():
+            print("Error: Please provide a valid prompt.")
+            sys.exit(1)
+            
+
+        # Define the model you want to use
+    model_name = "gemini-1.5-flash" # A common and capable model
 
 
 
-# Update code to accept a command line argument for the prompt, if prompt not provided, print error message and exit program with exit code 1
-if len(sys.argv) < 2:
-    print("Error: Please provide a prompt as a command line argument.")
-    sys.exit(1)
-
-# Extract the user prompt from command line arguments, excluding any flags (arguments starting with '--')
-prompt_args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
-user_prompt = " ".join(prompt_args)
-
-# if user_prompt is only flag arguments, print error message and exit program with exit code 1
-if not user_prompt.strip():
-    print("Error: Please provide a valid prompt.")
-    sys.exit(1)
 
 
-# create new list of types.Content and set the only message as the user's prompt'
-messages = [user_prompt]
+    # create new list of types.Content and set the only message as the user's prompt'
+    messages = [user_prompt]
 
-# Replace your client creation and response generation with:
-model = genai.GenerativeModel(
-    model_name=model_name,
-    system_instruction=system_prompt
-)
+    # Replace your client creation and response generation with:
+    model = genai.GenerativeModel(
+        model_name=model_name,
+        system_instruction=system_prompt
+    )
 
-# Temp comment out the actual API call to avoid making a real request
-response = model.generate_content(
-    user_prompt,  # or whatever variable holds your prompt
-    tools=[available_functions],
-)
+    # Temp comment out the actual API call to avoid making a real request
+    response = model.generate_content(
+        user_prompt,  # or whatever variable holds your prompt
+        tools=[available_functions],
+    )
 
-# Mock response for testing 
-"""
-class MockResponse:
-    def __init__(self):
-        self.text = "I'M JUST A ROBOT"
+    # Mock response for testing 
+    """
+    class MockResponse:
+        def __init__(self):
+            self.text = "I'M JUST A ROBOT"
 
-response = MockResponse()
-"""
+    response = MockResponse()
+    """
 
 
-# Print the generated content
-handle_function_calls(response)
+    # Print the generated content
+    result = handle_function_calls(response, is_verbose)
 
-# If verbose flag is present, print the user prompt and number of tokens used
-if "--verbose" in sys.argv:
-    print(f"User prompt: {user_prompt}")
-    # Print number of tokens used
-    print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
-    print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+    # print result.parts[0].function_response.response if result and verbose flag is present
+    if result and is_verbose:
+        if hasattr(result, 'parts'):
+                        # Object format
+            if result.parts and result.parts[0].function_response:
+                 print(f"-> {result.parts[0].function_response.response}")
+                
+                
+            elif isinstance(result, dict) and 'parts' in result:
+                # Dictionary format
+                if result['parts'] and 'function_response' in result['parts'][0]:
+                    print(f"-> {result['parts'][0]['function_response']['response']}")
+       
 
+    # If verbose flag is present, print the user prompt and number of tokens used
+    """if "--verbose" in sys.argv:
+        print(f"User prompt: {user_prompt}")
+        # Print number of tokens used
+        print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+        print(f"Response tokens: {response.usage_metadata.candidates_token_count}")"""
 
 
 
