@@ -1,9 +1,10 @@
-import os 
+import os
 from dotenv import load_dotenv
-# from google import genai
-import google.generativeai as genai
-from google.generativeai import types 
+import google.genai as genai
+from google.genai import types
 import sys
+import google.generativeai as genai
+# ...rest as needed
 from functions.get_files_info import schema_get_files_info, handle_function_calls, available_functions, call_function
 from config import system_prompt
 
@@ -48,7 +49,7 @@ if __name__ == "__main__":
             
 
         # Define the model you want to use
-    model_name = "gemini-1.5-flash" # A common and capable model
+    model_name = "gemini-2.5-flash" # A common and capable model
 
 
 
@@ -65,6 +66,7 @@ if __name__ == "__main__":
 
     # Temp comment out the actual API call to avoid making a real request
     response = model.generate_content(
+        
         user_prompt,  # or whatever variable holds your prompt
         tools=[available_functions],
     )
@@ -90,11 +92,13 @@ if __name__ == "__main__":
                  print(f"-> {result.parts[0].function_response.response}")
                 
                 
-            elif isinstance(result, dict) and 'parts' in result:
-                # Dictionary format
-                if result['parts'] and 'function_response' in result['parts'][0]:
-                    print(f"-> {result['parts'][0]['function_response']['response']}")
-       
+        elif isinstance(result, dict) and 'parts' in result:
+            if (result['parts'] and 
+                len(result['parts']) > 0 and 
+                'function_response' in result['parts'][0] and
+                'response' in result['parts'][0]['function_response']):
+                print(f"-> {result['parts'][0]['function_response']['response']}")
+    
 
     # If verbose flag is present, print the user prompt and number of tokens used
     """if "--verbose" in sys.argv:

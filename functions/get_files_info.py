@@ -1,12 +1,19 @@
 import os
 from google import generativeai as genai
-from google.generativeai import types
+from google.genai import types
+
+
+
+
 
 from functions.run_python import run_python_file
+
+
 
 # define working_directory as the current working directory
 working_directory = os.getcwd()
 
+directory = None # Default to None, which will list the working directory itself
 
 
 def get_files_info(working_directory, directory=None):
@@ -15,7 +22,7 @@ def get_files_info(working_directory, directory=None):
 		directory = working_directory
 
 	# use os.path.join() to ensure the directory is relative to the working directory
-	directory = os.path.join(working_directory, directory)
+	
 	
 	# Ensure the working directory and directory are absolute paths
 	parent_dir = os.path.abspath(working_directory)
@@ -119,14 +126,14 @@ def write_file(working_directory, file_path, content):
 	
 
 # Use types.FunctionDeclaration to build teh "declaration" or "schema" of the function
-schema_get_files_info = types.protos.FunctionDeclaration(
+schema_get_files_info = genai.types.protos.FunctionDeclaration(
     name="get_files_info",
     description="Lists files in the specified directory along with their sizes, constrained to the working directory.",
-    parameters=types.protos.Schema(
-        type=types.protos.Type.OBJECT,
+    parameters=genai.types.protos.Schema(
+        type=genai.types.protos.Type.OBJECT,
         properties={
-            "directory": types.protos.Schema(
-                type=types.protos.Type.STRING,
+            "directory": genai.types.protos.Schema(
+                type=genai.types.protos.Type.STRING,
                 description="The directory to list files from, relative to the working directory. If not provided, lists files in the working directory itself.",
             ),
         },
@@ -134,14 +141,14 @@ schema_get_files_info = types.protos.FunctionDeclaration(
 )
 
 # build schema_get_file_content function
-schema_get_file_content = types.protos.FunctionDeclaration(
+schema_get_file_content = genai.types.protos.FunctionDeclaration(
 	name="get_file_content",
 	description="Retrieves the content of a specified file, constrained to the working directory.",
-	parameters=types.protos.Schema(
-		type=types.protos.Type.OBJECT,
+	parameters=genai.types.protos.Schema(
+		type=genai.types.protos.Type.OBJECT,
 		properties={
-			"file_path": types.protos.Schema(
-				type=types.protos.Type.STRING,
+			"file_path": genai.types.protos.Schema(
+				type=genai.types.protos.Type.STRING,
 				description="The path to the file to retrieve content from, relative to the working directory.",
 			),
 		},
@@ -149,18 +156,18 @@ schema_get_file_content = types.protos.FunctionDeclaration(
 )
 
 # build schema_run_python_file function
-schema_run_python_file = types.protos.FunctionDeclaration(
+schema_run_python_file = genai.types.protos.FunctionDeclaration(
 	name="run_python_file",
 	description="runs a Python file and returns its output, constrained to the working directory.",
-	parameters=types.protos.Schema(
-		type=types.protos.Type.OBJECT,
+	parameters=genai.types.protos.Schema(
+		type=genai.types.protos.Type.OBJECT,
 		properties={
-			"file_path": types.protos.Schema(
-				type=types.protos.Type.STRING,
+			"file_path": genai.types.protos.Schema(
+				type=genai.types.protos.Type.STRING,
 				description="The path to the Python file to run, relative to the working directory.",
 			),
-			"content": types.protos.Schema(
-				type=types.protos.Type.STRING,
+			"content": genai.types.protos.Schema(
+				type=genai.types.protos.Type.STRING,
 				description="Executable Python code to run. If provided, this will override the file_path parameter.",
 			),
 		},
@@ -168,25 +175,25 @@ schema_run_python_file = types.protos.FunctionDeclaration(
 )
 
 # build schema_write_file function
-schema_write_file = types.protos.FunctionDeclaration(
+schema_write_file = genai.types.protos.FunctionDeclaration(
 	name="write_file",
 	description="Writes content to a specified file, creating the file if it does not exist, constrained to the working directory.",
-	parameters=types.protos.Schema(
-		type=types.protos.Type.OBJECT,
+	parameters=genai.types.protos.Schema(
+		type=genai.types.protos.Type.OBJECT,
 		properties={
-			"file_path": types.protos.Schema(
-				type=types.protos.Type.STRING,
+			"file_path": genai.types.protos.Schema(
+				type=genai.types.protos.Type.STRING,
 				description="The path to the file to write to, relative to the working directory.",
 			),
-			"content": types.protos.Schema(
-				type=types.protos.Type.STRING,
+			"content": genai.types.protos.Schema(
+				type=genai.types.protos.Type.STRING,
 				description="The content to write to the file.",
 			),
 		},
 	),
 )
 
-available_functions = types.protos.Tool(
+available_functions = genai.types.protos.Tool(
     function_declarations=[
         schema_get_files_info,
 		schema_get_file_content,
@@ -219,22 +226,22 @@ def call_function(function_call_part, verbose=False):
 	elif function_call_part.name == "write_file":
 		result = write_file(**args_with_working_dir)
 	else:
-		# return types.Content 
-		return types.ContentDict(
+		# return genai.types.Content 
+		return types.Content(
 			role="tool",
 			parts=[
-				types.PartDict.from_function_response(
+				types.Part.from_function_response(
 					name=function_call_part.name,
 					response={"error": f"Unknown function: {function_call_part.name}"},
 				)
 			],
 		)
 
-	# Return the result as types.Content
-	return types.ContentDict(
+	# Return the result as genai.types.Content
+	return types.Content(
 		role="tool",
 		parts=[
-			types.PartDict.from_function_response(
+			types.Part.from_function_response(
 				name=function_call_part.name,
 				response={"result": result}
 			)
